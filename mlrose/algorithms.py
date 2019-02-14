@@ -6,9 +6,29 @@
 
 import numpy as np
 from .decay import GeomDecay
+from time import perf_counter
+
+# class Opt_Algorithm(object):
+#     def __init__(self):
+#         self.reset_statistics()
+
+#     def reset_statistics(self):
+#         self.fitness_evals = 0
+#         self.fitness = None
+#         self.fitness_evals_history = []
+#         self.fitness_history = []
+
+# class Hill_climb(Opt_Algorithm):
+#     def __init__(self, problem, max_iters=np.inf, restarts=0, init_state=None):
+#         self.problem = problem
+#         self.max_iters = max_iters
+#         self.restarts = restarts
+#         self.init_state = init_state
+
+#     def evaluate(self):
 
 
-def hill_climb(problem, max_iters=np.inf, restarts=0, init_state=None):
+def hill_climb(problem, max_iters=np.inf, restarts=0, init_state=None, return_statistics=False):
     """Use standard hill climbing to find the optimum for a given
     optimization problem.
 
@@ -25,6 +45,8 @@ def hill_climb(problem, max_iters=np.inf, restarts=0, init_state=None):
     init_state: array, default: None
         1-D Numpy array containing starting state for algorithm.
         If :code:`None`, then a random state is used.
+    return_statistics: bool, default: False
+        If True, return includes dictionary of optimization run statistics
 
     Returns
     -------
@@ -32,6 +54,21 @@ def hill_climb(problem, max_iters=np.inf, restarts=0, init_state=None):
         Numpy array containing state that optimizes the fitness function.
     best_fitness: float
         Value of fitness function at best state.
+    statistics: dict
+        (Optional) Dictionary containing statistics from optimization:
+            iters int total number of iterations over all restarts
+            time: total time in seconds over all restarts
+            fitness_evals: int total number of fitness evaluations over all
+                           restarts
+            fitness_by_iteration: list of 1D arrays of fitness reached at each
+                                  iteration.  Each list item is for a 
+                                  corresponding restart  
+            fitness_history: 1D array of fitness reached on each restart
+            state_history: 1D array of state reached on each restart
+            iters_history: 1D array of iters run on each restart
+            time_history: 1D array of time taken to run each restart
+            fitness_evals_history: list of 1D arrays of number of evaluations
+                                   invoked up to this iteration on this restart
 
     References
     ----------
@@ -52,7 +89,22 @@ def hill_climb(problem, max_iters=np.inf, restarts=0, init_state=None):
     best_fitness = -1*np.inf
     best_state = None
 
-    for _ in range(restarts + 1):
+    # Initialize storage for statistics from each restart
+    if return_statistics:
+        fitness_history = []
+        state_history = []
+        iters_history = []
+        time_history = []
+        fitness_evals_history = []
+        fitness_by_iteration = []
+
+    for i_restart in range(restarts + 1):
+        if return_statistics:
+            fitness_evals_start = problem.fitness_evals # Could move this to a self.get_fitness()
+            time_start = perf_counter()
+            fitness_by_iteration.append([])
+            fitness_evals_history.append([])
+
         # Initialize optimization problem
         if init_state is None:
             problem.reset()
@@ -62,6 +114,11 @@ def hill_climb(problem, max_iters=np.inf, restarts=0, init_state=None):
         iters = 0
 
         while iters < max_iters:
+            # Store fitness of previous iteration
+            if return_statistics:
+                fitness_by_iteration[-1].append(problem.get_fitness() * problem.get_maximize())
+                fitness_evals_history[-1].append(problem.fitness_evals - fitness_evals_start)
+
             iters += 1
 
             # Find neighbors and determine best neighbor
@@ -76,13 +133,40 @@ def hill_climb(problem, max_iters=np.inf, restarts=0, init_state=None):
             else:
                 break
 
+        # Store statistics
+        if return_statistics:
+            fitness_by_iteration[-1].append(problem.get_fitness() * problem.get_maximize())
+            fitness_history.append(problem.get_fitness() * problem.get_maximize())
+            state_history.append(problem.get_state())
+            iters_history.append(iters)
+            time_history.append(perf_counter() - time_start)
+            fitness_evals_history[-1].append(problem.fitness_evals - fitness_evals_start)
+
         # Update best state and best fitness
         if problem.get_fitness() > best_fitness:
             best_fitness = problem.get_fitness()
             best_state = problem.get_state()
 
     best_fitness = problem.get_maximize()*best_fitness
-    return best_state, best_fitness
+
+    if return_statistics:
+        statistics = {
+            'fitness_history': np.array(fitness_history),
+            'state_history': np.array(state_history),
+            'iters_history': np.array(iters_history),
+            'time_history': np.array(time_history),
+            'fitness_evals_history': [np.array(feh) for feh in fitness_evals_history],
+            'fitness_by_iteration': [np.array(fbi) for fbi in fitness_by_iteration],
+            'iters': int(np.sum(iters_history)),
+            'time': np.sum(time_history),
+            'fitness_evals': int(np.sum([feh[-1] for feh in fitness_evals_history])),
+            'best_state': best_state,
+            'best_fitness': best_fitness,
+        }
+
+        return best_state, best_fitness, statistics
+    else:
+        return best_state, best_fitness
 
 
 def random_hill_climb(problem, max_attempts=10, max_iters=np.inf, restarts=0,
@@ -172,7 +256,8 @@ def random_hill_climb(problem, max_attempts=10, max_iters=np.inf, restarts=0,
 
 
 def simulated_annealing(problem, schedule=GeomDecay(), max_attempts=10,
-                        max_iters=np.inf, init_state=None):
+                        max_iters=np.inf, init_state=None, 
+                        return_statistics=False):
     """Use simulated annealing to find the optimum for a given
     optimization problem.
 
@@ -191,6 +276,8 @@ def simulated_annealing(problem, schedule=GeomDecay(), max_attempts=10,
     init_state: array, default: None
         1-D Numpy array containing starting state for algorithm.
         If :code:`None`, then a random state is used.
+    return_statistics: bool, default: False
+        If True, return includes dictionary of optimization run statistics
 
     Returns
     -------
@@ -198,6 +285,21 @@ def simulated_annealing(problem, schedule=GeomDecay(), max_attempts=10,
         Numpy array containing state that optimizes the fitness function.
     best_fitness: float
         Value of fitness function at best state.
+    statistics: dict
+        (Optional) Dictionary containing statistics from optimization:
+            iters int total number of iterations over all restarts
+            time: total time in seconds over all restarts
+            fitness_evals: int total number of fitness evaluations over all
+                           restarts
+            fitness_by_iteration: list of 1D arrays of fitness reached at each
+                                  iteration.  Each list item is for a 
+                                  corresponding restart (for Simulated 
+                                  Annealing, this is always a single element
+                                  list)
+            fitness_evals_history: list of 1D arrays of number of evaluations
+                                   invoked up to this iteration on this restart
+                                   (for Simulated Annealing, this is always a
+                                   single element list)
 
     References
     ----------
@@ -224,7 +326,20 @@ def simulated_annealing(problem, schedule=GeomDecay(), max_attempts=10,
     attempts = 0
     iters = 0
 
+    # Initialize storage for statistics
+    if return_statistics:
+        fitness_evals_start = problem.fitness_evals # Could move this to a self.get_fitness()
+        time_start = perf_counter()
+        fitness_by_iteration = [[]]
+        fitness_evals_history = [[]]
+
+
     while (attempts < max_attempts) and (iters < max_iters):
+        # Store fitness of previous iteration
+        if return_statistics:
+            fitness_by_iteration[-1].append(problem.get_fitness() * problem.get_maximize())
+            fitness_evals_history[-1].append(problem.fitness_evals - fitness_evals_start)
+
         temp = schedule.evaluate(iters)
         iters += 1
 
@@ -252,11 +367,25 @@ def simulated_annealing(problem, schedule=GeomDecay(), max_attempts=10,
     best_fitness = problem.get_maximize()*problem.get_fitness()
     best_state = problem.get_state()
 
-    return best_state, best_fitness
+    if return_statistics:
+        fitness_by_iteration[-1].append(problem.get_maximize()*problem.get_fitness())
+        statistics = {
+            'iters': iters,
+            'time': perf_counter() - time_start,
+            'fitness_evals': problem.fitness_evals - fitness_evals_start,
+            'best_state': best_state,
+            'best_fitness': best_fitness,
+            'fitness_by_iteration': [np.array(fbi) for fbi in fitness_by_iteration],
+            'fitness_evals_history': [np.array(feh) for feh in fitness_evals_history],
+        }
+
+        return best_state, best_fitness, statistics
+    else:
+        return best_state, best_fitness
 
 
 def genetic_alg(problem, pop_size=200, mutation_prob=0.1, max_attempts=10,
-                max_iters=np.inf):
+                max_iters=np.inf, return_statistics=False):
     """Use a standard genetic algorithm to find the optimum for a given
     optimization problem.
 
@@ -275,6 +404,8 @@ def genetic_alg(problem, pop_size=200, mutation_prob=0.1, max_attempts=10,
         Maximum number of attempts to find a better state at each step.
     max_iters: int, default: np.inf
         Maximum number of iterations of the algorithm.
+    return_statistics: bool, default: False
+        If True, return includes dictionary of optimization run statistics
 
     Returns
     -------
@@ -282,6 +413,20 @@ def genetic_alg(problem, pop_size=200, mutation_prob=0.1, max_attempts=10,
         Numpy array containing state that optimizes the fitness function.
     best_fitness: float
         Value of fitness function at best state.
+    statistics: dict
+        (Optional) Dictionary containing statistics from optimization:
+            iters int total number of iterations over all restarts
+            time: total time in seconds over all restarts
+            fitness_evals: int total number of fitness evaluations over all
+                           restarts
+            fitness_by_iteration: list of 1D arrays of fitness reached at each
+                      iteration.  Each list item is for a 
+                      corresponding restart (for Genetic Algorithm, this is 
+                      always a single element list)
+            fitness_evals_history: list of 1D arrays of number of evaluations
+                                   invoked up to this iteration on this restart
+                                   (for Genetic Algorithm, this is always a
+                                   single element list)
 
     References
     ----------
@@ -313,7 +458,19 @@ def genetic_alg(problem, pop_size=200, mutation_prob=0.1, max_attempts=10,
     attempts = 0
     iters = 0
 
+    # Initialize storage for statistics
+    if return_statistics:
+        fitness_evals_start = problem.fitness_evals # Could move this to a self.get_fitness()
+        time_start = perf_counter()
+        fitness_by_iteration = [[]]
+        fitness_evals_history = [[]]
+
     while (attempts < max_attempts) and (iters < max_iters):
+        # Store fitness of previous iteration
+        if return_statistics:
+            fitness_by_iteration[-1].append(problem.get_fitness() * problem.get_maximize())
+            fitness_evals_history[-1].append(problem.fitness_evals - fitness_evals_start)
+
         iters += 1
 
         # Calculate breeding probabilities
@@ -351,11 +508,24 @@ def genetic_alg(problem, pop_size=200, mutation_prob=0.1, max_attempts=10,
     best_fitness = problem.get_maximize()*problem.get_fitness()
     best_state = problem.get_state()
 
-    return best_state, best_fitness
+    if return_statistics:
+        fitness_by_iteration[-1].append(problem.get_maximize()*problem.get_fitness())
+        statistics = {
+            'iters': iters,
+            'time': perf_counter() - time_start,
+            'fitness_evals': problem.fitness_evals - fitness_evals_start,
+            'best_state': best_state,
+            'best_fitness': best_fitness,
+            'fitness_by_iteration': [np.array(fbi) for fbi in fitness_by_iteration],
+            'fitness_evals_history': [np.array(feh) for feh in fitness_evals_history],
+        }
+        return best_state, best_fitness, statistics
+    else:
+        return best_state, best_fitness
 
 
 def mimic(problem, pop_size=200, keep_pct=0.2, max_attempts=10,
-          max_iters=np.inf):
+          max_iters=np.inf, return_statistics=False):
     """Use MIMIC to find the optimum for a given optimization problem.
 
     Parameters
@@ -372,6 +542,8 @@ def mimic(problem, pop_size=200, keep_pct=0.2, max_attempts=10,
         Maximum number of attempts to find a better neighbor at each step.
     max_iters: int, default: np.inf
         Maximum number of iterations of the algorithm.
+    return_statistics: bool, default: False
+        If True, return includes dictionary of optimization run statistics
 
     Returns
     -------
@@ -379,7 +551,20 @@ def mimic(problem, pop_size=200, keep_pct=0.2, max_attempts=10,
         Numpy array containing state that optimizes the fitness function.
     best_fitness: float
         Value of fitness function at best state.
-
+    statistics: dict
+        (Optional) Dictionary containing statistics from optimization:
+            iters int total number of iterations over all restarts
+            time: total time in seconds over all restarts
+            fitness_evals: int total number of fitness evaluations over all
+                           restarts
+            fitness_by_iteration: list of 1D arrays of fitness reached at each
+                      iteration.  Each list item is for a 
+                      corresponding restart (for MIMIC, this is always a single
+                      element list)
+            fitness_evals_history: list of 1D arrays of number of evaluations
+                                   invoked up to this iteration on this restart
+                                   (for MIMIC, this is always a single element 
+                                   list)
     References
     ----------
     De Bonet, J., C. Isbell, and P. Viola (1997). MIMIC: Finding Optima by
@@ -418,28 +603,34 @@ def mimic(problem, pop_size=200, keep_pct=0.2, max_attempts=10,
     attempts = 0
     iters = 0
 
+    # Initialize storage for statistics
+    if return_statistics:
+        fitness_evals_start = problem.fitness_evals # Could move this to a self.get_fitness()
+        time_start = perf_counter()
+        fitness_by_iteration = [[]]
+        fitness_evals_history = [[]]
+        
     while (attempts < max_attempts) and (iters < max_iters):
-        # print(f'{iters}, {attempts}')
+        # Store fitness of previous iteration
+        if return_statistics:
+            # This the appropriate measure of fitness here?
+            fitness_by_iteration[-1].append(problem.eval_fitness(problem.best_child()) * problem.get_maximize())
+            fitness_evals_history[-1].append(problem.fitness_evals - fitness_evals_start)
+
         iters += 1
 
         # Get top n percent of population
-        # print('problem.find_top_pct(keep_pct)')
         problem.find_top_pct(keep_pct)
 
         # Update probability estimates
-        # print("problem.eval_node_probs()")
         problem.eval_node_probs()
 
         # Generate new sample
-        # print("new_sample = problem.sample_pop(pop_size)")
         new_sample = problem.sample_pop(pop_size)
-        # print("problem.set_population(new_sample)")
         problem.set_population(new_sample)
 
-        # print("next_state = problem.best_child()")
         next_state = problem.best_child()
 
-        # print("next_fitness = problem.eval_fitness(next_state)")
         next_fitness = problem.eval_fitness(next_state)
 
         # If best child is an improvement,
@@ -453,5 +644,18 @@ def mimic(problem, pop_size=200, keep_pct=0.2, max_attempts=10,
 
     best_fitness = problem.get_maximize()*problem.get_fitness()
     best_state = problem.get_state().astype(int)
-
-    return best_state, best_fitness
+    
+    if return_statistics:
+        fitness_by_iteration[-1].append(problem.get_maximize()*problem.get_fitness())
+        statistics = {
+            'iters': iters,
+            'time': perf_counter() - time_start,
+            'fitness_evals': problem.fitness_evals - fitness_evals_start,
+            'best_state': best_state,
+            'best_fitness': best_fitness,
+            'fitness_by_iteration': [np.array(fbi) for fbi in fitness_by_iteration],
+            'fitness_evals_history': [np.array(feh) for feh in fitness_evals_history],
+        }
+        return best_state, best_fitness, statistics
+    else:
+        return best_state, best_fitness

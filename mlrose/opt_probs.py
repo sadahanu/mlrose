@@ -44,6 +44,8 @@ class OptProb:
         self.pop_fitness = []
         self.mate_probs = []
 
+        self.reset_statistics()
+
         if maximize:
             self.maximize = 1.0
         else:
@@ -208,6 +210,11 @@ class OptProb:
 
         self.pop_fitness = np.array(pop_fitness)
 
+    def reset_statistics(self):
+        """Reset the optimization statistics
+        """
+        self.fitness_evals = 0
+
     def set_state(self, new_state):
         """
         Change the current state vector to a specified value
@@ -288,7 +295,6 @@ class DiscreteOpt(OptProb):
 
         # Convert minimum spanning tree to depth first tree with node 0 as root
         dft = depth_first_tree(csr_matrix(mst.toarray()), 0, directed=False)
-        dft = dft.toarray()
         dft = np.round(dft.toarray(), 10)
 
         # Determine parent of each node
