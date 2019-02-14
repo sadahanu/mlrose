@@ -8,26 +8,6 @@ import numpy as np
 from .decay import GeomDecay
 from time import perf_counter
 
-# class Opt_Algorithm(object):
-#     def __init__(self):
-#         self.reset_statistics()
-
-#     def reset_statistics(self):
-#         self.fitness_evals = 0
-#         self.fitness = None
-#         self.fitness_evals_history = []
-#         self.fitness_history = []
-
-# class Hill_climb(Opt_Algorithm):
-#     def __init__(self, problem, max_iters=np.inf, restarts=0, init_state=None):
-#         self.problem = problem
-#         self.max_iters = max_iters
-#         self.restarts = restarts
-#         self.init_state = init_state
-
-#     def evaluate(self):
-
-
 def hill_climb(problem, max_iters=np.inf, restarts=0, init_state=None, return_statistics=False):
     """Use standard hill climbing to find the optimum for a given
     optimization problem.
@@ -609,7 +589,7 @@ def mimic(problem, pop_size=200, keep_pct=0.2, max_attempts=10,
         time_start = perf_counter()
         fitness_by_iteration = [[]]
         fitness_evals_history = [[]]
-        
+
     while (attempts < max_attempts) and (iters < max_iters):
         # Store fitness of previous iteration
         if return_statistics:
