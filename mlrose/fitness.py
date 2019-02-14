@@ -49,7 +49,6 @@ class OneMax:
         fitness: float
             Value of fitness function.
         """
-
         fitness = sum(state)
         return fitness
 

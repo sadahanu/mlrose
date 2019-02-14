@@ -25,7 +25,6 @@ class OptProb:
     """
 
     def __init__(self, length, fitness_fn, maximize=True):
-
         if length < 0:
             raise Exception("""length must be a positive integer.""")
         elif not isinstance(length, int):
@@ -40,6 +39,7 @@ class OptProb:
         self.neighbors = []
         self.fitness_fn = fitness_fn
         self.fitness = 0
+        self.fitness_evals = 0
         self.population = []
         self.pop_fitness = []
         self.mate_probs = []
@@ -92,6 +92,7 @@ class OptProb:
         fitness: float
             Value of fitness function.
         """
+        self.fitness_evals += 1
         if len(state) != self.length:
             raise Exception("state length must match problem length")
 
@@ -248,7 +249,6 @@ class DiscreteOpt(OptProb):
     def __init__(self, length, fitness_fn, maximize=True, max_val=2):
 
         OptProb.__init__(self, length, fitness_fn, maximize)
-
         if self.fitness_fn.get_prob_type() == 'continuous':
             raise Exception("""fitness_fn must have problem type 'discrete',"""
                             + """ 'either' or 'tsp'. Define problem as"""
@@ -289,10 +289,18 @@ class DiscreteOpt(OptProb):
         # Convert minimum spanning tree to depth first tree with node 0 as root
         dft = depth_first_tree(csr_matrix(mst.toarray()), 0, directed=False)
         dft = dft.toarray()
-
+        dft_rounded = dft.copy()
+        dft_rounded = dft_rounded.round(7)
+        # with printoptions(precision=3, suppress=True):
+        # print(f'dft: \n{dft}')
+        # print(f'dft_rounded: \n{dft_rounded}')
         # Determine parent of each node
         parent = np.argmin(dft[:, 1:], axis=0)
-
+        # print(f'parent in eval_node_probs: {parent}')
+        parent_rounded = np.argmin(dft_rounded[:, 1:], axis=0)
+        # print(f'parent in eval_node_probs (rounded): {parent_rounded}')
+        print("Using parent_rounded instead of parent")
+        parent = parent_rounded
         # Get probs
         probs = np.zeros([self.length, self.max_val, self.max_val])
 
@@ -343,8 +351,10 @@ class DiscreteOpt(OptProb):
         sample_order = []
         last = [0]
         parent = np.array(self.parent_nodes)
+        # print(f'parent: {parent}')
 
         while len(sample_order) < self.length:
+            # print(f'sample_order: {sample_order}')
             inds = []
 
             for i in last:
@@ -353,6 +363,7 @@ class DiscreteOpt(OptProb):
             sample_order += last
             last = inds
 
+        # print(f'sample_order (final): {sample_order}')
         self.sample_order = sample_order
 
     def find_top_pct(self, keep_pct):

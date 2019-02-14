@@ -419,20 +419,27 @@ def mimic(problem, pop_size=200, keep_pct=0.2, max_attempts=10,
     iters = 0
 
     while (attempts < max_attempts) and (iters < max_iters):
+        # print(f'{iters}, {attempts}')
         iters += 1
 
         # Get top n percent of population
+        # print('problem.find_top_pct(keep_pct)')
         problem.find_top_pct(keep_pct)
 
         # Update probability estimates
+        # print("problem.eval_node_probs()")
         problem.eval_node_probs()
 
         # Generate new sample
+        # print("new_sample = problem.sample_pop(pop_size)")
         new_sample = problem.sample_pop(pop_size)
+        # print("problem.set_population(new_sample)")
         problem.set_population(new_sample)
 
+        # print("next_state = problem.best_child()")
         next_state = problem.best_child()
 
+        # print("next_fitness = problem.eval_fitness(next_state)")
         next_fitness = problem.eval_fitness(next_state)
 
         # If best child is an improvement,
