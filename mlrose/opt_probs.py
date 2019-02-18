@@ -24,8 +24,14 @@ class OptProb:
         Set :code:`False` for minimization problem.
     """
 
-    def __init__(self, length, fitness_fn, maximize=True):
-        if length < 0:
+    def __init__(self, length=None, fitness_fn=None, maximize=True):
+        if length is None:
+            # Try to infer length from fitness_fn
+            try:
+                self.length = int(fitness_fn.length)
+            except:
+                raise ValueError("Cannot infer length from fitness function")
+        elif length < 0:
             raise Exception("""length must be a positive integer.""")
         elif not isinstance(length, int):
             if length.is_integer():
@@ -253,7 +259,7 @@ class DiscreteOpt(OptProb):
         (max_val - 1), inclusive.
     """
 
-    def __init__(self, length, fitness_fn, maximize=True, max_val=2):
+    def __init__(self, length=None, fitness_fn=None, maximize=True, max_val=2):
 
         OptProb.__init__(self, length, fitness_fn, maximize)
         if self.fitness_fn.get_prob_type() == 'continuous':
@@ -286,9 +292,15 @@ class DiscreteOpt(OptProb):
         mutual_info = np.zeros([self.length, self.length])
         for i in range(self.length - 1):
             for j in range(i + 1, self.length):
-                mutual_info[i, j] = -1 * mutual_info_score(
-                    self.keep_sample[:, i],
-                    self.keep_sample[:, j])
+                # DEBUGGING CODE
+                try:
+                    mutual_info[i, j] = -1 * mutual_info_score(
+                        self.keep_sample[:, i],
+                        self.keep_sample[:, j])
+                except ValueError:
+                    print(f'self.keep_sample[:, i] = {self.keep_sample[:, i]}')
+                    print(f'self.keep_sample[:, j] = {self.keep_sample[:, j]}')
+                    raise Exception("Caught value error")
 
         # Find minimum spanning tree of mutual info matrix
         mst = minimum_spanning_tree(csr_matrix(mutual_info))
@@ -386,6 +398,11 @@ class DiscreteOpt(OptProb):
         keep_inds = np.where(self.pop_fitness >= theta)[0]
 
         # Determine sample for keeping
+        if len(keep_inds) == 0:
+            print("WARNING: Found no indices that are above the theta threshold")
+            print(f'keep_pct = {keep_pct}')
+            print(f'theta = {theta}')
+            print(f'self.pop_fitness = {self.pop_fitness}')
         self.keep_sample = self.population[keep_inds]
 
     def get_keep_sample(self):
@@ -593,7 +610,7 @@ class ContinuousOpt(OptProb):
         Step size used in determining neighbors of current state.
     """
 
-    def __init__(self, length, fitness_fn, maximize=True, min_val=0,
+    def __init__(self, length=None, fitness_fn=None, maximize=True, min_val=0,
                  max_val=1, step=0.1):
 
         OptProb.__init__(self, length, fitness_fn, maximize=maximize)
@@ -831,7 +848,7 @@ class TSPOpt(DiscreteOpt):
         argument is ignored if fitness_fn or coords is not :code:`None`.
     """
 
-    def __init__(self, length, fitness_fn=None, maximize=False, coords=None,
+    def __init__(self, length=None, fitness_fn=None, maximize=False, coords=None,
                  distances=None):
 
         if (fitness_fn is None) and (coords is None) and (distances is None):
@@ -839,6 +856,13 @@ class TSPOpt(DiscreteOpt):
                             + """ distances must be specified.""")
         elif fitness_fn is None:
             fitness_fn = TravellingSales(coords=coords, distances=distances)
+
+        if length is None:
+            # Try to infer length from fitness_fn
+            try:
+                length = int(fitness_fn.length)
+            except:
+                raise ValueError("Cannot infer length from fitness function")
 
         DiscreteOpt.__init__(self, length, fitness_fn, maximize,
                              max_val=length)

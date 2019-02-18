@@ -63,6 +63,21 @@ class OneMax:
         """
         return self.prob_type
 
+    def optimum_score(self, state):
+        """Evaluates the best score possible for a given state vector.
+
+        Parameters
+        ----------
+        state: array
+            State array used as template for evaluating optimum score
+
+        Returns
+        -------
+        score: float
+            Optimal value of fitness function.
+        """
+        return float(len(state))
+
 
 class FlipFlop:
     """Fitness function for Flip Flop optimization problem. Evaluates the
@@ -124,6 +139,21 @@ class FlipFlop:
             or 'either'.
         """
         return self.prob_type
+
+    def optimum_score(self, state):
+        """Evaluates the best score possible for a given state vector.
+
+        Parameters
+        ----------
+        state: array
+            State array used as template for evaluating optimum score
+
+        Returns
+        -------
+        score: float
+            Optimal value of fitness function.
+        """
+        return float(len(state)-1)
 
 
 def head(_b, _x):
@@ -620,6 +650,11 @@ class Knapsack:
         """
         return self.prob_type
 
+    @property
+    def length(self):
+        return len(self.weights)
+    
+
 
 class TravellingSales:
     """Fitness function for Travelling Salesman optimization problem.
@@ -789,6 +824,10 @@ class TravellingSales:
         """
         return self.prob_type
 
+    @property
+    def length(self):
+        return len(self.coords)
+    
 
 class Queens:
     """Fitness function for N-Queens optimization problem. Evaluates the

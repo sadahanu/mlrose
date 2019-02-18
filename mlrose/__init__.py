@@ -11,3 +11,4 @@ from .fitness import (OneMax, FlipFlop, FourPeaks, SixPeaks, ContinuousPeaks,
                       CustomFitness)
 from .neural import NeuralNetwork, LinearRegression, LogisticRegression
 from .opt_probs import DiscreteOpt, ContinuousOpt, TSPOpt
+from .utilities import GridSearch

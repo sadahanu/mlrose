@@ -6,7 +6,7 @@
 import numpy as np
 from sklearn.metrics import mean_squared_error, log_loss
 from .activation import identity, relu, sigmoid, softmax, tanh
-from .algorithms import random_hill_climb, simulated_annealing, genetic_alg
+from .algorithms import hill_climb, random_hill_climb, simulated_annealing, genetic_alg
 from .opt_probs import ContinuousOpt
 from .decay import GeomDecay
 
@@ -393,6 +393,10 @@ class NeuralNetwork:
         Maximum number of attempts to find a better state. Only required if
         :code:`early_stopping = True`.
 
+    restarts: int, default: 0
+        Number of restarts for :code:`algorithm = 'random_hill_climb'` or 
+        :code:`algorithm = 'hill_climb'`
+
     Attributes
     ----------
     fitted_weights: array
@@ -413,7 +417,7 @@ class NeuralNetwork:
                  algorithm='random_hill_climb', max_iters=100, bias=True,
                  is_classifier=True, learning_rate=0.1, early_stopping=False,
                  clip_max=1e+10, schedule=GeomDecay(), pop_size=200,
-                 mutation_prob=0.1, max_attempts=10):
+                 mutation_prob=0.1, max_attempts=10, restarts=0):
 
         if (not isinstance(max_iters, int) and max_iters != np.inf
                 and not max_iters.is_integer()) or (max_iters < 0):
@@ -459,6 +463,7 @@ class NeuralNetwork:
         self.schedule = schedule
         self.pop_size = pop_size
         self.mutation_prob = mutation_prob
+        self.restarts = restarts
 
         activation_dict = {'identity': identity, 'relu': relu,
                            'sigmoid': sigmoid, 'tanh': tanh}
@@ -469,7 +474,7 @@ class NeuralNetwork:
             'relu', 'sigmoid' or 'tanh'.""")
 
         if algorithm in ['random_hill_climb', 'simulated_annealing',
-                         'genetic_alg', 'gradient_descent']:
+                         'genetic_alg', 'gradient_descent', 'hill_climb']:
             self.algorithm = algorithm
         else:
             raise Exception("""Algorithm must be one of: 'random_hill_climb',
@@ -485,6 +490,7 @@ class NeuralNetwork:
         self.loss = np.inf
         self.output_activation = None
         self.predicted_probs = []
+        self.fit_statistics = None
 
     def fit(self, X, y, init_weights=None):
         """Fit neural network to data.
@@ -540,24 +546,38 @@ class NeuralNetwork:
             if init_weights is None:
                 init_weights = np.random.uniform(-1, 1, num_nodes)
 
-            fitted_weights, loss = random_hill_climb(
+            fitted_weights, loss, statistics = random_hill_climb(
                 problem,
                 max_attempts=self.max_attempts, max_iters=self.max_iters,
-                restarts=0, init_state=init_weights)
+                restarts=self.restarts, init_state=init_weights, return_statistics=True)
+            self.fit_statistics = statistics
+        elif self.algorithm == 'hill_climb':
+            if init_weights is None:
+                init_weights = np.random.uniform(-1, 1, num_nodes)
+
+            fitted_weights, loss, statistics = hill_climb(
+                problem,
+                max_iters=self.max_iters,
+                restarts=self.restarts, init_state=init_weights, return_statistics=True)
+            self.fit_statistics = statistics
 
         elif self.algorithm == 'simulated_annealing':
             if init_weights is None:
                 init_weights = np.random.uniform(-1, 1, num_nodes)
-            fitted_weights, loss = simulated_annealing(
+            fitted_weights, loss, statistics = simulated_annealing(
                 problem,
                 schedule=self.schedule, max_attempts=self.max_attempts,
-                max_iters=self.max_iters, init_state=init_weights)
+                max_iters=self.max_iters, init_state=init_weights, 
+                return_statistics=True)
+            self.fit_statistics = statistics
 
         elif self.algorithm == 'genetic_alg':
-            fitted_weights, loss = genetic_alg(
+            fitted_weights, loss, statistics = genetic_alg(
                 problem,
                 pop_size=self.pop_size, mutation_prob=self.mutation_prob,
-                max_attempts=self.max_attempts, max_iters=self.max_iters)
+                max_attempts=self.max_attempts, max_iters=self.max_iters,
+                return_statistics=True)
+            self.fit_statistics = statistics
 
         else:  # Gradient descent case
             if init_weights is None:
